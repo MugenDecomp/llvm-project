@@ -857,6 +857,12 @@ static std::string createResponseFile(const opt::InputArgList &args,
       os << arg->getSpelling() << '@' << quote(rewritePath(orderFile)) << '\n';
       break;
     }
+    case OPT_iorder: {
+      StringRef iOrderFile = arg->getValue();
+      iOrderFile.consume_front("@");
+      os << arg->getSpelling() << '@' << quote(rewritePath(iOrderFile)) << '\n';
+      break;
+    }
     case OPT_pdbstream: {
       const std::pair<StringRef, StringRef> nameFile =
           StringRef(arg->getValue()).split("=");
@@ -1089,6 +1095,50 @@ void LinkerDriver::parseOrderFile(StringRef arg) {
                   << " [LNK4037]";
     } else
       ctx.config.order[s] = INT_MIN + ctx.config.order.size();
+  }
+
+  // Include in /reproduce: output if applicable.
+  ctx.driver.takeBuffer(std::move(mb));
+}
+
+// Parse an /iorder file. If an option is given, the linker orders
+// imports as provided.
+void LinkerDriver::parseImportOrderFile(StringRef arg) {
+  // For some reason, the MSVC linker requires a filename to be
+  // preceded by "@".
+  if (!arg.starts_with("@")) {
+    Err(ctx) << "malformed /iorder option: '@' missing";
+    return;
+  }
+
+  // Get a list of all imports for error checking.
+  DenseSet<StringRef> set;
+  for (Export &e1 : ctx.symtab.exports) {
+    set.insert(e1.symbolName);
+    Log(ctx) << "find new export with name " << e1.symbolName;
+  }
+
+  // Open a file.
+  StringRef path = arg.substr(1);
+  std::unique_ptr<MemoryBuffer> mb =
+      CHECK(MemoryBuffer::getFile(path, /*IsText=*/false,
+                                  /*RequiresNullTerminator=*/false,
+                                  /*IsVolatile=*/true),
+            "could not open " + path);
+
+  // Parse a file. An order file contains one symbol per line.
+  // All symbols that were not present in a given order file are
+  // considered to have the lowest priority 0 and are placed at
+  // end of an output section.
+  for (StringRef arg : args::getLines(mb->getMemBufferRef())) {
+    std::string s(arg);
+
+    if (set.count(s) == 0) {
+      if (ctx.config.warnMissingOrderSymbol)
+        Warn(ctx) << "/iorder:" << arg << ": missing import: " << s
+                  << " [LNKC0001]";
+    } else
+      ctx.config.importOrder[s] = INT_MIN + ctx.config.order.size();
   }
 
   // Include in /reproduce: output if applicable.
@@ -2752,6 +2802,11 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
       Err(ctx) << "/order and /call-graph-order-file may not be used together";
     parseOrderFile(arg->getValue());
     config->callGraphProfileSort = false;
+  }
+
+  // Handle /iorder.
+  if (auto *arg = args.getLastArg(OPT_iorder)) {
+    parseImportOrderFile(arg->getValue());
   }
 
   // Handle /call-graph-ordering-file and /call-graph-profile-sort (default on).

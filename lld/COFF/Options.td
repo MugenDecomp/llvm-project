@@ -89,6 +89,7 @@ def mllvm   : P<"mllvm", "Options to pass to LLVM">;
 def nodefaultlib : P<"nodefaultlib", "Remove a default library">;
 def opt     : P<"opt", "Control optimizations">;
 def order   : P<"order", "Put functions in order">;
+def iorder   : P<"iorder", "Put imports in order">;
 def out     : P<"out", "Path to file to write output">;
 def natvis : P<"natvis", "Path to natvis file to embed in the PDB">;
 def pdb : P<"pdb", "PDB file path">;

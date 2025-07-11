@@ -147,6 +147,8 @@ private:
   // sections int he same order as their names appear in the given file.
   void parseOrderFile(StringRef arg);
 
+  void parseImportOrderFile(StringRef arg);
+
   void parseCallGraphFile(StringRef path);
 
   void parsePDBAltPath();
