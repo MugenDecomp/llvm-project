@@ -2808,7 +2808,7 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     parseImportOrderFile(arg->getValue());
   }
 
-  if (args.hasFlag(OPT_ihead, OPT_INVALID, false)) {
+  if (args.hasFlag(OPT_ihead, OPT_ihead_no, false)) {
     config->placeIatAtHead = true;
   }
 

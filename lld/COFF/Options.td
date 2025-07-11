@@ -361,4 +361,5 @@ def arm64xsameaddress : P_priv<"arm64xsameaddress">;
 
 // flags for decomp
 def iorder   : P<"iorder", "Put imports in order">;
-def ihead    : P<"ihead", "Ensure IAT is placed at the head of rdata">;
+defm ihead : B<"ihead", "Ensure IAT is placed at the head of rdata",
+                  "Use default IAT placement after data">;
