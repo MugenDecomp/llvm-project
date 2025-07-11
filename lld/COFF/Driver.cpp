@@ -1114,8 +1114,8 @@ void LinkerDriver::parseImportOrderFile(StringRef arg) {
   // Get a set of all imports for error checking.
   DenseSet<StringRef> set;
   ctx.symtab.forEachSymbol([&set, this](Symbol *s) {
-    set.insert(s->getName());
-    Log(ctx) << "find new symbol with name " << s->getName() << ", isLazy=" << s->isLazy();
+    if (s->isLazy())
+      set.insert(s->getName());
   });
 
   // Open a file.
