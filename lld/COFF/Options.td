@@ -89,7 +89,6 @@ def mllvm   : P<"mllvm", "Options to pass to LLVM">;
 def nodefaultlib : P<"nodefaultlib", "Remove a default library">;
 def opt     : P<"opt", "Control optimizations">;
 def order   : P<"order", "Put functions in order">;
-def iorder   : P<"iorder", "Put imports in order">;
 def out     : P<"out", "Path to file to write output">;
 def natvis : P<"natvis", "Path to natvis file to embed in the PDB">;
 def pdb : P<"pdb", "PDB file path">;
@@ -358,3 +357,8 @@ def tlbout : P_priv<"tlbout">;
 def verbose_all : P_priv<"verbose">;
 def guardsym : P_priv<"guardsym">;
 def arm64xsameaddress : P_priv<"arm64xsameaddress">;
+
+
+// flags for decomp
+def iorder   : P<"iorder", "Put imports in order">;
+def ihead    : P<"ihead", "Ensure IAT is placed at the head of rdata">;

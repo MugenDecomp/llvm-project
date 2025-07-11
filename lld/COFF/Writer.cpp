@@ -218,6 +218,7 @@ private:
   void mergeSections();
   void sortECChunks();
   void appendECImportTables();
+  void placeIatAtHeadDynamic();
   void removeUnusedSections();
   void assignAddresses();
   bool isInRange(uint16_t relType, uint64_t s, uint64_t p, int margin,
@@ -780,6 +781,7 @@ void Writer::run() {
     mergeSections();
     sortECChunks();
     appendECImportTables();
+    placeIatAtHeadDynamic();
     createDynamicRelocs();
     removeUnusedSections();
     finalizeAddresses();
@@ -981,6 +983,23 @@ void Writer::appendECImportTables() {
     rdataSec->chunks.insert(rdataSec->chunks.end(),
                             delayIdata.getAuxIat().begin(),
                             delayIdata.getAuxIat().end());
+  }
+}
+
+void Writer::placeIatAtHeadDynamic() {
+  if (!ctx.config.placeIatAtHead) return;
+
+  Log(ctx) << "Will place IAT at head of generated executable.";
+
+  // IAT is always placed at the beginning of .rdata section.
+  // Insert it here, after all merges all done.
+  const uint32_t rdata = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ;
+  if (PartialSection *importAddresses = findPartialSection(".idata$5", rdata)) {
+    rdataSec->chunks.insert(rdataSec->chunks.begin(),
+                            importAddresses->chunks.begin(),
+                            importAddresses->chunks.end());
+    rdataSec->contribSections.insert(rdataSec->contribSections.begin(),
+                                     importAddresses);
   }
 }
 

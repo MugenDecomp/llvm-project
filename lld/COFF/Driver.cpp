@@ -1114,8 +1114,7 @@ void LinkerDriver::parseImportOrderFile(StringRef arg) {
   // Get a set of all imports for error checking.
   DenseSet<StringRef> set;
   ctx.symtab.forEachSymbol([&set, this](Symbol *s) {
-    if (s->isLazy())
-      set.insert(s->getName());
+    set.insert(s->getName());
   });
 
   // Open a file.
@@ -2807,6 +2806,10 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   // Handle /iorder.
   if (auto *arg = args.getLastArg(OPT_iorder)) {
     parseImportOrderFile(arg->getValue());
+  }
+
+  if (args.hasFlag(OPT_ihead, OPT_INVALID, false)) {
+    config->placeIatAtHead = true;
   }
 
   // Handle /call-graph-ordering-file and /call-graph-profile-sort (default on).
