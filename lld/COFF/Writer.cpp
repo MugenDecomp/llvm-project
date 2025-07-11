@@ -1175,6 +1175,9 @@ void Writer::createSections() {
         (pSec->name == ".idata$5" || pSec->name == ".idata$9"))
       continue;
 
+    // if the IAT needs to be placed at head, we should skip adding it.
+    if (ctx.config.placeIatAtHead && pSec->name == ".idata$5") continue;
+
     OutputSection *sec = createSection(name, outChars);
     for (Chunk *c : pSec->chunks)
       sec->addChunk(c);
