@@ -2812,6 +2812,10 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     config->placeIatAtHead = true;
   }
 
+  if (args.hasFlag(OPT_ilhints, OPT_ilhints_no, false)) {
+    config->interleaveHints = true;
+  }
+
   // Handle /call-graph-ordering-file and /call-graph-profile-sort (default on).
   if (config->callGraphProfileSort) {
     llvm::TimeTraceScope timeScope("Call graph");

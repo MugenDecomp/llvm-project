@@ -913,6 +913,10 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     addresses.insert(addresses.end(), tempAddresses.begin(), tempAddresses.end());
     hints.insert(hints.end(), tempHints.begin(), tempHints.end());
 
+    // if DLL hints should be interleaved, insert DLL name after the import hints.
+    if (ctx.config.interleaveHints)
+      hints.push_back(make<StringChunk>(syms[0]->getDLLName()));
+
     // Terminate with null values.
     lookups.push_back(lookupsTerminator ? lookupsTerminator
                                         : make<NullChunk>(ctx));

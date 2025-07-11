@@ -941,7 +941,8 @@ void Writer::addSyntheticIdata() {
   add(".idata$5", idata.addresses);
   if (!idata.hints.empty())
     add(".idata$6", idata.hints);
-  add(".idata$7", idata.dllNames);
+  if (!ctx.config.interleaveHints)
+    add(".idata$7", idata.dllNames);
   if (!idata.auxIat.empty())
     add(".idata$9", idata.auxIat);
   if (!idata.auxIatCopy.empty())

@@ -279,6 +279,9 @@ struct Configuration {
   // Used for /ihead:
   bool placeIatAtHead = false;
 
+  // Used for /ilhints:
+  bool interleaveHints = false;
+
   uint64_t align = 4096;
   uint64_t imageBase = -1;
   uint64_t fileAlign = 512;
