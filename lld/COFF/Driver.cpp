@@ -1137,7 +1137,7 @@ void LinkerDriver::parseImportOrderFile(StringRef arg) {
         Warn(ctx) << "/iorder:" << arg << ": missing import: " << s
                   << " [LNKC0001]";
     } else
-      ctx.config.importOrder[s] = INT_MIN + ctx.config.order.size();
+      ctx.config.importOrder[s] = INT_MIN + ctx.config.importOrder.size();
   }
 
   // Include in /reproduce: output if applicable.

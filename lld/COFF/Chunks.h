@@ -60,7 +60,9 @@ public:
     SectionECKind,
     OtherKind,
     ImportThunkKind,
-    ECExportThunkKind
+    ECExportThunkKind,
+    OrdinalOnlyKind,
+    LookupKind
   };
   Kind kind() const { return chunkKind; }
 

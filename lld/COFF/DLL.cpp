@@ -53,6 +53,10 @@ public:
     memcpy(buf + 2, name.data(), name.size());
   }
 
+  uint16_t getOrdinal() const {
+    return hint;
+  }
+
 private:
   StringRef name;
   uint16_t hint;
@@ -62,7 +66,7 @@ private:
 class LookupChunk : public NonSectionChunk {
 public:
   explicit LookupChunk(COFFLinkerContext &ctx, Chunk *c)
-      : hintName(c), ctx(ctx) {
+      : NonSectionChunk(LookupKind), hintName(c), ctx(ctx) {
     setAlignment(ctx.config.wordsize);
   }
   size_t getSize() const override { return ctx.config.wordsize; }
@@ -86,7 +90,7 @@ private:
 class OrdinalOnlyChunk : public NonSectionChunk {
 public:
   explicit OrdinalOnlyChunk(COFFLinkerContext &c, uint16_t v)
-      : ordinal(v), ctx(c) {
+      : NonSectionChunk(OrdinalOnlyKind), ordinal(v), ctx(c) {
     setAlignment(ctx.config.wordsize);
   }
   size_t getSize() const override { return ctx.config.wordsize; }
@@ -783,6 +787,12 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     size_t base = lookups.size();
     Chunk *lookupsTerminator = nullptr, *addressesTerminator = nullptr;
     uint32_t nativeOnly = 0;
+    // in order to sort according to the IORDER directive,
+    // need to create a map from ordinal to symbol name.
+    std::map<uint16_t, StringRef> ordinalMap;
+    std::vector<Chunk *> tempAddresses;
+    std::vector<Chunk *> tempLookups;
+    bool useImportOrderMap = ctx.config.importOrder.size() > 0;
     for (DefinedImportData *s : syms) {
       uint16_t ord = s->getOrdinal();
       HintNameChunk *hintChunk = nullptr;
@@ -797,6 +807,10 @@ void IdataContents::create(COFFLinkerContext &ctx) {
         addressesChunk = make<LookupChunk>(ctx, hintChunk);
         hints.push_back(hintChunk);
       }
+
+      // only store these if IORDER was passed, since otherwise it's a waste of time and memory.
+      if (useImportOrderMap)
+        ordinalMap[ord] = s->getName();
 
       // Detect the first EC-only import in the hybrid IAT. Emit null chunk
       // as a terminator for the native view, and add an ARM64X relocation to
@@ -828,8 +842,8 @@ void IdataContents::create(COFFLinkerContext &ctx) {
                                sizeof(uint64_t), addressesTerminator);
       }
 
-      lookups.push_back(lookupsChunk);
-      addresses.push_back(addressesChunk);
+      tempLookups.push_back(lookupsChunk);
+      tempAddresses.push_back(addressesChunk);
 
       if (s->file->isEC()) {
         auto chunk = make<AuxImportChunk>(s->file);
@@ -846,6 +860,50 @@ void IdataContents::create(COFFLinkerContext &ctx) {
         ++nativeOnly;
       }
     }
+
+    auto SortByOrderFile = [&](Chunk *a, Chunk *b) {
+      uint16_t ordinalA = 0, ordinalB = 0;
+      int targetA = 0, targetB = 0;
+
+      if (a->kind() == Chunk::OrdinalOnlyKind) {
+        ordinalA = static_cast<OrdinalOnlyChunk *>(a)->ordinal;
+      } else if (a->kind() == Chunk::LookupKind) {
+        ordinalA = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(a)->hintName)->getOrdinal();
+      }
+
+      if (b->kind() == Chunk::OrdinalOnlyKind) {
+        ordinalB = static_cast<OrdinalOnlyChunk *>(b)->ordinal;
+      } else if (b->kind() == Chunk::LookupKind) {
+        ordinalB = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(b)->hintName)->getOrdinal();
+      }
+
+      if (ordinalA != 0) {
+        StringRef symbol = ordinalMap[ordinalA];
+        targetA = ctx.config.importOrder[symbol];
+      }
+
+      if (ordinalB != 0) {
+        StringRef symbol = ordinalMap[ordinalB];
+        targetB = ctx.config.importOrder[symbol];
+      }
+
+      return targetA < targetB;
+    };
+
+    // if an IORDER file was provided, sort the addresses and lookups.
+    // at this point we are processing each DLL in alphabetical order
+    // the sorting here is WITHIN the DLL instead of within the entire import table,
+    // because Windows is expecting the DLLs to be null-terminated and the alphabetical
+    // DLL ordering is desirable.
+    // THIS MAY CAUSE UNUSUAL BEHAVIOUR
+    // TODO: somehow check that the iorder file groups imports from each DLL together
+    llvm::stable_sort(tempLookups, SortByOrderFile);
+    llvm::stable_sort(tempAddresses, SortByOrderFile);
+
+    // push the temp vectors into the real address/lookup vectors
+    lookups.insert(lookups.end(), tempLookups.begin(), tempLookups.end());
+    addresses.insert(addresses.end(), tempAddresses.begin(), tempAddresses.end());
+
     // Terminate with null values.
     lookups.push_back(lookupsTerminator ? lookupsTerminator
                                         : make<NullChunk>(ctx));
