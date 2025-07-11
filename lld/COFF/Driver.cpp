@@ -1111,12 +1111,12 @@ void LinkerDriver::parseImportOrderFile(StringRef arg) {
     return;
   }
 
-  // Get a list of all imports for error checking.
+  // Get a set of all imports for error checking.
   DenseSet<StringRef> set;
-  for (Export &e1 : ctx.symtab.exports) {
-    set.insert(e1.symbolName);
-    Log(ctx) << "find new export with name " << e1.symbolName;
-  }
+  ctx.symtab.forEachSymbol([&set, this](Symbol *s) {
+    set.insert(s->getName());
+    Log(ctx) << "find new symbol with name " << s->getName() << ", isLazy=" << s->isLazy();
+  });
 
   // Open a file.
   StringRef path = arg.substr(1);
