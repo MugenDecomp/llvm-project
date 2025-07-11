@@ -40,7 +40,10 @@
 
 #ifdef __linux__
 #ifdef __x86_64__
-#include <asm/prctl.h>
+// this file is not present in Alpine. I do not believe we need this tool anyway.
+//#include <asm/prctl.h>
+#define ARCH_SET_GS			0x1001
+#define ARCH_SET_FS			0x1002
 #endif // __x86_64__
 #include <sys/mman.h>
 #include <sys/syscall.h>
