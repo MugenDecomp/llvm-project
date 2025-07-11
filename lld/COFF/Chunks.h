@@ -62,7 +62,8 @@ public:
     ImportThunkKind,
     ECExportThunkKind,
     OrdinalOnlyKind,
-    LookupKind
+    LookupKind,
+    HintKind
   };
   Kind kind() const { return chunkKind; }
 

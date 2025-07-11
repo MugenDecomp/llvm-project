@@ -39,7 +39,7 @@ namespace {
 // A chunk for the import descriptor table.
 class HintNameChunk : public NonSectionChunk {
 public:
-  HintNameChunk(StringRef n, uint16_t h) : name(n), hint(h) {}
+  HintNameChunk(StringRef n, uint16_t h) : NonSectionChunk(HintKind), name(n), hint(h) {}
 
   size_t getSize() const override {
     // Starts with 2 byte Hint field, followed by a null-terminated string,
@@ -792,6 +792,7 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     std::map<uint16_t, StringRef> ordinalMap;
     std::vector<Chunk *> tempAddresses;
     std::vector<Chunk *> tempLookups;
+    std::vector<Chunk *> tempHints;
     bool useImportOrderMap = ctx.config.importOrder.size() > 0;
     for (DefinedImportData *s : syms) {
       uint16_t ord = s->getOrdinal();
@@ -805,7 +806,7 @@ void IdataContents::create(COFFLinkerContext &ctx) {
         hintChunk = make<HintNameChunk>(s->getExternalName(), ord);
         lookupsChunk = make<LookupChunk>(ctx, hintChunk);
         addressesChunk = make<LookupChunk>(ctx, hintChunk);
-        hints.push_back(hintChunk);
+        tempHints.push_back(hintChunk);
       }
 
       // only store these if IORDER was passed, since otherwise it's a waste of time and memory.
@@ -869,12 +870,16 @@ void IdataContents::create(COFFLinkerContext &ctx) {
         ordinalA = static_cast<OrdinalOnlyChunk *>(a)->ordinal;
       } else if (a->kind() == Chunk::LookupKind) {
         ordinalA = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(a)->hintName)->getOrdinal();
+      } else if (a->kind() == Chunk::HintKind) {
+        ordinalA = static_cast<HintNameChunk *>(a)->getOrdinal();
       }
 
       if (b->kind() == Chunk::OrdinalOnlyKind) {
         ordinalB = static_cast<OrdinalOnlyChunk *>(b)->ordinal;
       } else if (b->kind() == Chunk::LookupKind) {
         ordinalB = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(b)->hintName)->getOrdinal();
+      } else if (b->kind() == Chunk::HintKind) {
+        ordinalB = static_cast<HintNameChunk *>(b)->getOrdinal();
       }
 
       if (ordinalA != 0) {
@@ -900,9 +905,13 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     llvm::stable_sort(tempLookups, SortByOrderFile);
     llvm::stable_sort(tempAddresses, SortByOrderFile);
 
+    // sort hints as well
+    llvm::stable_sort(tempHints, SortByOrderFile);
+
     // push the temp vectors into the real address/lookup vectors
     lookups.insert(lookups.end(), tempLookups.begin(), tempLookups.end());
     addresses.insert(addresses.end(), tempAddresses.begin(), tempAddresses.end());
+    hints.insert(hints.end(), tempHints.begin(), tempHints.end());
 
     // Terminate with null values.
     lookups.push_back(lookupsTerminator ? lookupsTerminator
