@@ -1144,6 +1144,22 @@ void LinkerDriver::parseImportOrderFile(StringRef arg) {
   ctx.driver.takeBuffer(std::move(mb));
 }
 
+// Parse a string of the form of "<from>=<to>".
+void LinkerDriver::parseComdatRealign(StringRef s) {
+  auto [from, to] = s.split('=');
+  if (from.empty() || to.empty())
+    Fatal(ctx) << "/realign: invalid argument: " << s;
+  auto count = ctx.config.realignMap.count(from);
+  if (count != 0)
+    Fatal(ctx) << "/realign: conflicts: " << s;
+  uint64_t alignment = 0;
+  parseNumbers(to, &alignment);
+  if (!isPowerOf2_64(alignment))
+    Err(ctx) << "/realign: not a power of two: " << to;
+  ctx.config.realignMap[from] = alignment;
+  Log(ctx) << "Assigned custom COMDAT alignment " << to << " to COMDAT with name " << from;
+}
+
 void LinkerDriver::parseCallGraphFile(StringRef path) {
   std::unique_ptr<MemoryBuffer> mb =
       CHECK(MemoryBuffer::getFile(path, /*IsText=*/false,
@@ -1953,6 +1969,10 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   // Handle /alternatename
   for (auto *arg : args.filtered(OPT_alternatename))
     ctx.symtab.parseAlternateName(arg->getValue());
+
+  // Handle /realign
+  for (auto *arg : args.filtered(OPT_realign))
+    parseComdatRealign(arg->getValue());
 
   // Handle /include
   for (auto *arg : args.filtered(OPT_incl))

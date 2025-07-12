@@ -450,7 +450,11 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
   // this is only concerned with code COMDATs for now.
   if (c->isCOMDAT() && symtab.ctx.config.comdatAlign != 0 && name.starts_with(".text")) {
     c->setAlignment(symtab.ctx.config.comdatAlign);
-    log("Setting COMDAT alignment to " + std::to_string(symtab.ctx.config.comdatAlign) + " for section with name " + name);
+    if (c && c->sym) {
+      log("Setting COMDAT alignment to " + std::to_string(symtab.ctx.config.comdatAlign) + " for COMDAT with name " + c->sym->getName());
+    } else {
+      log("Setting COMDAT alignment to " + std::to_string(symtab.ctx.config.comdatAlign) + " for an unknown COMDAT");
+    }
   }
 
   return c;

@@ -223,6 +223,9 @@ struct Configuration {
   // Used for /iorder.
   llvm::StringMap<int> importOrder;
 
+  // Used for /realign.
+  llvm::StringMap<int> realignMap;
+
   // Used for /lldmap.
   std::string lldmapFile;
 
