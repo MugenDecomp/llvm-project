@@ -942,11 +942,11 @@ void IdataContents::create(COFFLinkerContext &ctx) {
         auto found = std::find_if(tempAddresses.begin(), tempAddresses.end(), [&](Chunk *c) {
           uint16_t ordinal = 0;
           if (c->kind() == Chunk::OrdinalOnlyKind) {
-            ordinal = static_cast<OrdinalOnlyChunk *>(c)->ordinal;
+            ordinal = static_cast<OrdinalOnlyChunk *>(c)->ordinal + 1;
           } else if (c->kind() == Chunk::LookupKind) {
-            ordinal = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(c)->hintName)->getOrdinal();
+            ordinal = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(c)->hintName)->getOrdinal() + 1;
           } else if (c->kind() == Chunk::HintKind) {
-            ordinal = static_cast<HintNameChunk *>(c)->getOrdinal();
+            ordinal = static_cast<HintNameChunk *>(c)->getOrdinal() + 1;
           }
 
           if (ordinal != 0) {
