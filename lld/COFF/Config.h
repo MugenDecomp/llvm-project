@@ -282,6 +282,9 @@ struct Configuration {
   // Used for /ilhints:
   bool interleaveHints = false;
 
+  // Used for /aligncomdat:
+  uint64_t comdatAlign = 16;
+
   uint64_t align = 4096;
   uint64_t imageBase = -1;
   uint64_t fileAlign = 512;

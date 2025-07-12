@@ -2108,6 +2108,13 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   for (auto *arg : args.filtered(OPT_aligncomm))
     ctx.symtab.parseAligncomm(arg->getValue());
 
+  // Handle /aligncomdat
+  if (auto *arg = args.getLastArg(OPT_aligncomdat)) {
+    parseNumbers(arg->getValue(), &config->comdatAlign);
+    if (!isPowerOf2_64(config->comdatAlign))
+      Err(ctx) << "/aligncomdat: not a power of two: " << StringRef(arg->getValue());
+  }
+
   // Handle /manifestdependency.
   for (auto *arg : args.filtered(OPT_manifestdependency))
     config->manifestDependencies.insert(arg->getValue());

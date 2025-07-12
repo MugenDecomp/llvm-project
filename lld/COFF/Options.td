@@ -365,3 +365,4 @@ defm ihead : B<"ihead", "Ensure IAT is placed at the head of rdata",
                   "Use default IAT placement after data">;
 defm ilhints : B<"ilhints", "Interleave import hints with DLL import descriptors",
                   "Place DLL import descriptors after all import hints">;
+def aligncomdat : P<"aligncomdat", "Set COMDAT section alignment">;
