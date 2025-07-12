@@ -446,6 +446,13 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
   else if (!(sec->Characteristics & llvm::COFF::IMAGE_SCN_LNK_INFO))
     chunks.push_back(c);
 
+  // handle COMDAT section chunks where COMDAT alignment needs to be applied.
+  // this is only concerned with code COMDATs for now.
+  if (c->isCOMDAT() && symtab.ctx.config.comdatAlign != 0 && name.starts_with(".text")) {
+    c->setAlignment(symtab.ctx.config.comdatAlign);
+    log("Setting COMDAT alignment to " + std::to_string(symtab.ctx.config.comdatAlign) + " for section with name " + name);
+  }
+
   return c;
 }
 
