@@ -902,11 +902,13 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     // DLL ordering is desirable.
     // THIS MAY CAUSE UNUSUAL BEHAVIOUR
     // TODO: somehow check that the iorder file groups imports from each DLL together
-    llvm::stable_sort(tempLookups, SortByOrderFile);
-    llvm::stable_sort(tempAddresses, SortByOrderFile);
+    if (useImportOrderMap) {
+      llvm::stable_sort(tempLookups, SortByOrderFile);
+      llvm::stable_sort(tempAddresses, SortByOrderFile);
 
-    // sort hints as well
-    llvm::stable_sort(tempHints, SortByOrderFile);
+      // sort hints as well
+      llvm::stable_sort(tempHints, SortByOrderFile);
+    }
 
     // push the temp vectors into the real address/lookup vectors
     lookups.insert(lookups.end(), tempLookups.begin(), tempLookups.end());
@@ -928,9 +930,41 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     }
 
     for (int i = 0, e = syms.size(); i < e; ++i) {
-      syms[i]->setLocation(addresses[base + i]);
+      // in IORDER cases, `addresses` is IORDER-file sorted and `syms` is alphabetical-sorted,
+      // so just using `addresses[base + i]` will cause mismatches.
+      // use this for the base case and in the IORDER case, look up the correct chunk in `tempAddresses`.
+      Chunk * target = addresses[base + i];
+      if (useImportOrderMap) {
+        auto found = std::find_if(tempAddresses.begin(), tempAddresses.end(), [&](Chunk *c) {
+          uint16_t ordinal = 0;
+          if (c->kind() == Chunk::OrdinalOnlyKind) {
+            ordinal = static_cast<OrdinalOnlyChunk *>(c)->ordinal;
+          } else if (c->kind() == Chunk::LookupKind) {
+            ordinal = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(c)->hintName)->getOrdinal();
+          } else if (c->kind() == Chunk::HintKind) {
+            ordinal = static_cast<HintNameChunk *>(c)->getOrdinal();
+          }
+
+          if (ordinal != 0) {
+            StringRef symbol = ordinalMap[ordinal];
+            if (symbol.compare(syms[i]->getName()) == 0) {
+              Log(ctx) << "Found a matching chunk for symbol " << syms[i]->getName() << ", will remap to this target.";
+              return true;
+            }
+          }
+
+          return false;
+        });
+
+        int index = std::distance(tempAddresses.begin(), found);
+
+        if (index == tempAddresses.size()) Log(ctx) << "Could not find any matching chunk for symbol " << syms[i]->getName() << ", will use default.";
+        else target = addresses[base + index];
+      }
+
+      syms[i]->setLocation(target);
       if (syms[i]->file->hybridFile)
-        syms[i]->file->hybridFile->impSym->setLocation(addresses[base + i]);
+        syms[i]->file->hybridFile->impSym->setLocation(target);
     }
 
     // Create the import table header.
