@@ -810,8 +810,10 @@ void IdataContents::create(COFFLinkerContext &ctx) {
       }
 
       // only store these if IORDER was passed, since otherwise it's a waste of time and memory.
-      if (useImportOrderMap)
-        ordinalMap[ord] = s->getName();
+      if (useImportOrderMap) {
+        ordinalMap[ord + 1] = s->getName();
+        Log(ctx) << "map import with name " << s->getName() << " to ordinal(+1) " << std::to_string(ord + 1);
+      }
 
       // Detect the first EC-only import in the hybrid IAT. Emit null chunk
       // as a terminator for the native view, and add an ARM64X relocation to
@@ -863,23 +865,25 @@ void IdataContents::create(COFFLinkerContext &ctx) {
     }
 
     auto SortByOrderFile = [&](Chunk *a, Chunk *b) {
+      // note: 0 is a valid ordinal in DLL export tables.
+      // to work around this, we map the ordinal + 1 (so the first export has ID 1) and treat 0 as an invalid value here.
       uint16_t ordinalA = 0, ordinalB = 0;
       int targetA = 0, targetB = 0;
 
       if (a->kind() == Chunk::OrdinalOnlyKind) {
-        ordinalA = static_cast<OrdinalOnlyChunk *>(a)->ordinal;
+        ordinalA = static_cast<OrdinalOnlyChunk *>(a)->ordinal + 1;
       } else if (a->kind() == Chunk::LookupKind) {
-        ordinalA = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(a)->hintName)->getOrdinal();
+        ordinalA = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(a)->hintName)->getOrdinal() + 1;
       } else if (a->kind() == Chunk::HintKind) {
-        ordinalA = static_cast<HintNameChunk *>(a)->getOrdinal();
+        ordinalA = static_cast<HintNameChunk *>(a)->getOrdinal() + 1;
       }
 
       if (b->kind() == Chunk::OrdinalOnlyKind) {
-        ordinalB = static_cast<OrdinalOnlyChunk *>(b)->ordinal;
+        ordinalB = static_cast<OrdinalOnlyChunk *>(b)->ordinal + 1;
       } else if (b->kind() == Chunk::LookupKind) {
-        ordinalB = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(b)->hintName)->getOrdinal();
+        ordinalB = static_cast<HintNameChunk *>(static_cast<LookupChunk *>(b)->hintName)->getOrdinal() + 1;
       } else if (b->kind() == Chunk::HintKind) {
-        ordinalB = static_cast<HintNameChunk *>(b)->getOrdinal();
+        ordinalB = static_cast<HintNameChunk *>(b)->getOrdinal() + 1;
       }
 
       if (ordinalA != 0) {
