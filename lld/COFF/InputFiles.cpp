@@ -448,14 +448,8 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
 
   // handle COMDAT section chunks where COMDAT alignment needs to be applied.
   // this is only concerned with code COMDATs for now.
-  if (c->isCOMDAT() && symtab.ctx.config.comdatAlign != 0 && name.starts_with(".text")) {
+  if (c->isCOMDAT() && symtab.ctx.config.comdatAlign != 0 && name.starts_with(".text"))
     c->setAlignment(symtab.ctx.config.comdatAlign);
-    if (c && c->sym) {
-      log("Setting COMDAT alignment to " + std::to_string(symtab.ctx.config.comdatAlign) + " for COMDAT with name " + c->sym->getName());
-    } else {
-      log("Setting COMDAT alignment to " + std::to_string(symtab.ctx.config.comdatAlign) + " for an unknown COMDAT");
-    }
-  }
 
   return c;
 }
@@ -935,6 +929,11 @@ std::optional<Symbol *> ObjFile::createDefined(
       c->sym = cast<DefinedRegular>(leader);
       c->selection = selection;
       cast<DefinedRegular>(leader)->data = &c->repl;
+      
+      if (ctx.config.realignMap.count(c->sym->getName()) == 1) {
+        log("Update COMDAT alignment to " + std::to_string(ctx.config.realignMap[c->sym->getName()]) + " for COMDAT with name " + c->sym->getName());
+        c->setAlignment(ctx.config.realignMap[c->sym->getName()]);
+      }
     } else {
       sparseChunks[sectionNumber] = nullptr;
     }
