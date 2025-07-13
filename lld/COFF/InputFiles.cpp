@@ -446,6 +446,15 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
   else if (!(sec->Characteristics & llvm::COFF::IMAGE_SCN_LNK_INFO))
     chunks.push_back(c);
 
+  // if tail merge is not enabled, and the chunk is data-containing, we push a VirtualSectionChunk
+  // instead of a SectionChunk.
+  if (!symtab.ctx.config.tailMerge && (name.starts_with(".rdata") || name.starts_with(".data"))) {
+    VirtualSectionChunk * c2 = make<VirtualSectionChunk>(this, sec);
+    free(c); // i don't write C. is this correct or stupid?
+    c = c2;
+    log("Found a section with name " + name + " in objfile " + getName() + ", creating VirtualSection for it.");
+  }
+
   // handle COMDAT section chunks where COMDAT alignment needs to be applied.
   // this is only concerned with code COMDATs for now.
   if (c->isCOMDAT() && symtab.ctx.config.comdatAlign != 0 && name.starts_with(".text"))
@@ -845,6 +854,10 @@ std::optional<Symbol *> ObjFile::createDefined(
   int32_t sectionNumber = sym.getSectionNumber();
   if (sectionNumber == llvm::COFF::IMAGE_SYM_DEBUG)
     return nullptr;
+
+  if (sparseChunks[sectionNumber]->kind() == Chunk::VirtualSectionKind) {
+    log("Symbol with name " + getName() + " exists in a virtual section, this symbol will be divided into a new section.");
+  }
 
   if (sym.isEmptySectionDeclaration()) {
     // As there is no coff_section in the object file for these, make a
