@@ -673,7 +673,18 @@ void ObjFile::eliminateVirtualSectionChunks() {
     if (chunks[i] && chunks[i]->kind() == Chunk::VirtualSectionKind) {
       // this leaks memory...
       log("Replacing chunk with index " + std::to_string(i) + " with a non-live SectionChunk.");
-      chunks[i] = make<SectionChunk>(this, dyn_cast<VirtualSectionChunk>(chunks[i])->header);
+      VirtualSectionChunk *oldChunk = dyn_cast<VirtualSectionChunk>(chunks[i]);
+      chunks[i] = make<SectionChunk>(this, oldChunk->header);
+      
+      // must ALSO update Symbols in the virtual chunk to point to the new chunk.
+      for (auto sym : getSymbols()) {
+        if (sym && sym->kind() == Symbol::DefinedRegularKind) {
+          auto defined = dyn_cast_or_null<DefinedRegular>(sym);
+          if (defined && defined->getChunk() == oldChunk) {
+            defined->data = &dyn_cast<SectionChunk>(chunks[i])->repl;
+          }
+        }
+      }
     }
   }
 }
