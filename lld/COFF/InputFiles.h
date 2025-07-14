@@ -238,6 +238,8 @@ private:
   void initializeDependencies();
   void initializeECThunks();
 
+  void eliminateVirtualSectionChunks();
+
   SectionChunk *
   readSection(uint32_t sectionNumber,
               const llvm::object::coff_aux_section_definition *def,

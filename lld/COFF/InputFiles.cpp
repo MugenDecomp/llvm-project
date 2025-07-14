@@ -334,6 +334,7 @@ void ObjFile::parse() {
   // Read section and symbol tables.
   initializeChunks();
   initializeSymbols();
+  eliminateVirtualSectionChunks();
   initializeFlags();
   initializeDependencies();
   initializeECThunks();
@@ -414,6 +415,12 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
   SectionChunk *c;
   if (isArm64EC(getMachineType()))
     c = make<SectionChunkEC>(this, sec);
+  else if (!symtab.ctx.config.tailMerge && (name.starts_with(".rdata") || name.starts_with(".data"))) {
+    // if tail merge is not enabled, and the chunk is data-containing, we push a VirtualSectionChunk
+    // instead of a SectionChunk.
+    c = make<VirtualSectionChunk>(this, sec);
+    log("Found a section with name " + name + " in objfile " + getName() + ", creating VirtualSection for it.");
+  }
   else
     c = make<SectionChunk>(this, sec);
   if (def)
@@ -445,15 +452,6 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
     resourceChunks.push_back(c);
   else if (!(sec->Characteristics & llvm::COFF::IMAGE_SCN_LNK_INFO))
     chunks.push_back(c);
-
-  // if tail merge is not enabled, and the chunk is data-containing, we push a VirtualSectionChunk
-  // instead of a SectionChunk.
-  if (!symtab.ctx.config.tailMerge && (name.starts_with(".rdata") || name.starts_with(".data"))) {
-    VirtualSectionChunk * c2 = make<VirtualSectionChunk>(this, sec);
-    free(c); // i don't write C. is this correct or stupid?
-    c = c2;
-    log("Found a section with name " + name + " in objfile " + getName() + ", creating VirtualSection for it.");
-  }
 
   // handle COMDAT section chunks where COMDAT alignment needs to be applied.
   // this is only concerned with code COMDATs for now.
@@ -668,6 +666,18 @@ void ObjFile::initializeSymbols() {
   decltype(sparseChunks)().swap(sparseChunks);
 }
 
+// converts VirtualSectionChunks into SectionChunks with `live` set to false.
+// this is maybe safer than replacing them with EmptyChunk.
+void ObjFile::eliminateVirtualSectionChunks() {
+  for (int i = 0; i < chunks.size(); i++) {
+    if (chunks[i] && chunks[i]->kind() == Chunk::VirtualSectionKind) {
+      // this leaks memory...
+      log("Replacing chunk with index " + std::to_string(i) + " with a non-live SectionChunk.");
+      chunks[i] = make<SectionChunk>(this, dyn_cast<VirtualSectionChunk>(chunks[i])->header);
+    }
+  }
+}
+
 Symbol *ObjFile::createUndefined(COFFSymbolRef sym, bool overrideLazy) {
   StringRef name = check(coffObj->getSymbolName(sym));
   Symbol *s = symtab.addUndefined(name, this, overrideLazy);
@@ -855,8 +865,9 @@ std::optional<Symbol *> ObjFile::createDefined(
   if (sectionNumber == llvm::COFF::IMAGE_SYM_DEBUG)
     return nullptr;
 
-  if (sparseChunks[sectionNumber]->kind() == Chunk::VirtualSectionKind) {
-    log("Symbol with name " + getName() + " exists in a virtual section, this symbol will be divided into a new section.");
+  if (sparseChunks[sectionNumber] && sparseChunks[sectionNumber] != pendingComdat && sparseChunks[sectionNumber]->kind() == Chunk::VirtualSectionKind) {
+    StringRef name = getName();
+    log("Symbol with name " + name + " exists in a virtual section, this symbol will be divided into a new section.");
   }
 
   if (sym.isEmptySectionDeclaration()) {
