@@ -396,6 +396,9 @@ public:
   // and this chunk is considered as dead.
   SectionChunk *repl;
 
+  // this is just for debugging, useful to see which symbol maps to this chunk for split-chunk.
+  std::string splitSymbol;
+
 private:
   SectionChunk *assocChildren = nullptr;
 

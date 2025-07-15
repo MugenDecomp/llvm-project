@@ -1124,6 +1124,8 @@ void Writer::createSections() {
     StringRef name = c->getSectionName();
     if (shouldStripSectionSuffix(sc, name, ctx.config.mingw))
       name = name.split('$').first;
+    if (name == ".data$s" || name == ".rdata$s" || name == ".bss$s")
+      name = name.split('$').first;
 
     if (name.starts_with(".tls"))
       tlsAlignment = std::max(tlsAlignment, c->getAlignment());

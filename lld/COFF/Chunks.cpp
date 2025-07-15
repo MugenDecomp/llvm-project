@@ -74,7 +74,7 @@ MachineTypes SectionChunk::getMachine() const {
 // SectionChunk is one of the most frequently allocated classes, so it is
 // important to keep it as compact as possible. As of this writing, the number
 // below is the size of this class on x64 platforms.
-static_assert(sizeof(SectionChunk) <= 88, "SectionChunk grew unexpectedly");
+static_assert(sizeof(SectionChunk) <= 128, "SectionChunk grew unexpectedly");
 
 static void add16(uint8_t *p, int16_t v) { write16le(p, read16le(p) + v); }
 static void add32(uint8_t *p, int32_t v) { write32le(p, read32le(p) + v); }
@@ -717,7 +717,7 @@ bool SectionChunk::isCOMDAT() const {
 void SectionChunk::printDiscardedMessage() const {
   // Removed by dead-stripping. If it's removed by ICF, ICF already
   // printed out the name, so don't repeat that here.
-  if (sym && this == repl)
+  if (sym)
     log("Discarded " + sym->getName());
 }
 
