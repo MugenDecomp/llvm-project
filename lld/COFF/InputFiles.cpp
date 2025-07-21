@@ -334,6 +334,7 @@ void ObjFile::parse() {
   // Read section and symbol tables.
   initializeChunks();
   initializeSymbols();
+  eliminateVirtualSectionChunks();
   initializeFlags();
   initializeDependencies();
   initializeECThunks();
@@ -414,6 +415,14 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
   SectionChunk *c;
   if (isArm64EC(getMachineType()))
     c = make<SectionChunkEC>(this, sec);
+  else if (!symtab.ctx.config.tailMerge &&
+           (name.starts_with(".rdata") || name.starts_with(".data") ||
+            name.starts_with(".bss"))) {
+    // if tail merge is not enabled, and the chunk is data-containing, we push a VirtualSectionChunk
+    // instead of a SectionChunk.
+    c = make<VirtualSectionChunk>(this, sec);
+    log("Found a section with name " + name + " in objfile " + getName() + ", creating VirtualSection for it.");
+  }
   else
     c = make<SectionChunk>(this, sec);
   if (def)
@@ -535,8 +544,8 @@ void ObjFile::maybeAssociateSEHForMingw(
   }
 }
 
-Symbol *ObjFile::createRegular(COFFSymbolRef sym) {
-  SectionChunk *sc = sparseChunks[sym.getSectionNumber()];
+Symbol *ObjFile::createRegular(COFFSymbolRef sym, uint32_t sectionNumber) {
+  SectionChunk *sc = sparseChunks[sectionNumber];
   if (sym.isExternal()) {
     StringRef name = check(coffObj->getSymbolName(sym));
     if (sc)
@@ -644,7 +653,7 @@ void ObjFile::initializeSymbols() {
                << " without leader and unassociated, discarding";
       continue;
     }
-    symbols[i] = createRegular(sym);
+    symbols[i] = createRegular(sym, sym.getSectionNumber());
   }
 
   for (auto &kv : weakAliases) {
@@ -657,6 +666,20 @@ void ObjFile::initializeSymbols() {
 
   // Free the memory used by sparseChunks now that symbol loading is finished.
   decltype(sparseChunks)().swap(sparseChunks);
+}
+
+// converts VirtualSectionChunks into SectionChunks with `live` set to false.
+// this is maybe safer than replacing them with EmptyChunk.
+void ObjFile::eliminateVirtualSectionChunks() {
+  for (int i = 0; i < chunks.size(); i++) {
+    if (chunks[i] && chunks[i]->kind() == Chunk::VirtualSectionKind) {
+      // this leaks memory...
+      log("Replacing chunk with index " + std::to_string(i) + " with a non-live SectionChunk.");
+      VirtualSectionChunk *oldChunk = dyn_cast<VirtualSectionChunk>(chunks[i]);
+      chunks[i] = make<SectionChunk>(this, oldChunk->header);
+      dyn_cast<SectionChunk>(chunks[i])->live = false;
+    }
+  }
 }
 
 Symbol *ObjFile::createUndefined(COFFSymbolRef sym, bool overrideLazy) {
@@ -846,6 +869,75 @@ std::optional<Symbol *> ObjFile::createDefined(
   if (sectionNumber == llvm::COFF::IMAGE_SYM_DEBUG)
     return nullptr;
 
+  if (sparseChunks[sectionNumber] && sparseChunks[sectionNumber] != pendingComdat && sparseChunks[sectionNumber]->kind() == Chunk::VirtualSectionKind) {
+    StringRef name = getName();
+    // if the symbol is a "start-of-section" symbol, skip creating a concrete section for it.
+    if (!sym.isSectionDefinition()) {
+      // 1. find the symbol size and address.
+      // per https://wiki.osdev.org/COFF#Symbol_Table `n_value` is always an offset in .data/.bss sections.
+      uint32_t symbolOffset = sym.getValue();
+
+      // to determine symbol size we need to find the NEXT symbol.
+      // i can't trust that the symbol list is ordered so need to do a search.
+      // TODO: create a sorted list somewhere to avoid redoing this work constantly.
+      COFFSymbolRef nextSymbol = { };
+      int numSymbols = coffObj->getNumberOfSymbols();
+      for (uint32_t i = 0; i < numSymbols; ++i) {
+        COFFSymbolRef coffSym = check(coffObj->getSymbol(i));
+        // a valid neighbour symbol has a later offset and exists in the same section.
+        if (coffSym.getValue() > symbolOffset &&
+            coffSym.getSectionNumber() == sym.getSectionNumber() &&
+            (!nextSymbol.isSet() || coffSym.getValue() < nextSymbol.getValue())) {
+          nextSymbol = coffSym;
+        }
+      }
+
+      // symbol length is the diff between the offsets.
+      // if no nextSymbol was found it implies the symbol is the last in the section.
+      // just subtract from section length.
+      // (it seems like this can also find a garbage symbol, skip anything with storageclass=0)
+      uint32_t sectionLength = sparseChunks[sectionNumber]->header->SizeOfRawData;
+      int symbolLength = nextSymbol.isSet() && nextSymbol.getStorageClass() != 0 ? nextSymbol.getValue() - symbolOffset : sectionLength - symbolOffset;
+
+      log("Symbol with name " + name +
+          " is in a virtual section, creating concrete section starting at " +
+          std::to_string(symbolOffset) + " with length " +
+          std::to_string(symbolLength));
+
+      // 2. create a new section, add it to sparseChunks and chunks
+      auto baseChunk =
+          dyn_cast<VirtualSectionChunk>(sparseChunks[sectionNumber]);
+      coff_section *newSectionHeader = new coff_section{};
+      strncpy(newSectionHeader->Name, baseChunk->header->Name, 8);
+      strcat(newSectionHeader->Name, "$s");
+      newSectionHeader->VirtualSize = symbolLength;
+      newSectionHeader->VirtualAddress =
+          baseChunk->header->VirtualAddress + symbolOffset;
+      newSectionHeader->SizeOfRawData = symbolLength;
+      newSectionHeader->PointerToRawData =
+          baseChunk->header->PointerToRawData + symbolOffset;
+      newSectionHeader->PointerToRelocations =
+          baseChunk->header->PointerToRelocations; // TODO
+      newSectionHeader->PointerToLinenumbers = 0;
+      newSectionHeader->NumberOfRelocations =
+          baseChunk->header->NumberOfRelocations; // TODO
+      newSectionHeader->NumberOfLinenumbers = 0;
+
+      SectionChunk *newSection = make<SectionChunk>(this, newSectionHeader);
+      newSection->splitSymbol = name;
+      newSection->setAlignment(4);
+
+      chunks.push_back(newSection);
+      sparseChunks.push_back(newSection);
+
+      // 3. update sectionNumber with the index into sparseChunks
+      sectionNumber = sparseChunks.size() - 1;
+
+      // 4. add a nullptr to comdatDefs
+      comdatDefs.push_back(nullptr);
+    }
+  }
+
   if (sym.isEmptySectionDeclaration()) {
     // As there is no coff_section in the object file for these, make a
     // new virtual one, with everything zeroed out (i.e. an empty section),
@@ -950,7 +1042,7 @@ std::optional<Symbol *> ObjFile::createDefined(
     return std::nullopt;
   }
 
-  return createRegular(sym);
+  return createRegular(sym, sectionNumber);
 }
 
 MachineTypes ObjFile::getMachineType() const {

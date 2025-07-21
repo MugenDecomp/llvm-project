@@ -802,7 +802,7 @@ void Writer::run() {
       writeHeader<pe32_header>();
     }
     writeSections();
-    prepareLoadConfig();
+    //prepareLoadConfig();
     sortExceptionTables();
 
     // Fix up the alignment in the TLS Directory's characteristic field,
@@ -1123,6 +1123,8 @@ void Writer::createSections() {
     }
     StringRef name = c->getSectionName();
     if (shouldStripSectionSuffix(sc, name, ctx.config.mingw))
+      name = name.split('$').first;
+    if (name == ".data$s" || name == ".rdata$s" || name == ".bss$s")
       name = name.split('$').first;
 
     if (name.starts_with(".tls"))

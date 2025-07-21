@@ -238,6 +238,8 @@ private:
   void initializeDependencies();
   void initializeECThunks();
 
+  void eliminateVirtualSectionChunks();
+
   SectionChunk *
   readSection(uint32_t sectionNumber,
               const llvm::object::coff_aux_section_definition *def,
@@ -276,7 +278,7 @@ private:
                 std::vector<const llvm::object::coff_aux_section_definition *>
                     &comdatDefs,
                 bool &prevailingComdat);
-  Symbol *createRegular(COFFSymbolRef sym);
+  Symbol *createRegular(COFFSymbolRef sym, uint32_t sectionNumber);
   Symbol *createUndefined(COFFSymbolRef sym, bool overrideLazy);
 
   std::unique_ptr<COFFObjectFile> coffObj;

@@ -63,7 +63,8 @@ public:
     ECExportThunkKind,
     OrdinalOnlyKind,
     LookupKind,
-    HintKind
+    HintKind,
+    VirtualSectionKind
   };
   Kind kind() const { return chunkKind; }
 
@@ -395,6 +396,9 @@ public:
   // and this chunk is considered as dead.
   SectionChunk *repl;
 
+  // this is just for debugging, useful to see which symbol maps to this chunk for split-chunk.
+  std::string splitSymbol;
+
 private:
   SectionChunk *assocChildren = nullptr;
 
@@ -420,6 +424,18 @@ public:
   SectionChunkEC(ObjFile *file, const coff_section *header)
       : SectionChunk(file, header, SectionECKind) {}
   Defined *entryThunk = nullptr;
+};
+
+// a VirtualSectionChunk is a chunk used during splitting of data-containing sections in OBJ files.
+// each data-containing section (.data*/.rdata*) are registered as VirtualSectionChunk, then
+// concrete SectionChunks are broken off for each symbol during initialization.
+// a VirtualSectionChunk is replaced with an EmptyChunk after symbol initialization.
+class VirtualSectionChunk final : public SectionChunk {
+public:
+  static bool classof(const Chunk *c) { return c->kind() == VirtualSectionKind; }
+
+  VirtualSectionChunk(ObjFile *file, const coff_section *header)
+      : SectionChunk(file, header, VirtualSectionKind) {}
 };
 
 // Inline methods to implement faux-virtual dispatch for SectionChunk.

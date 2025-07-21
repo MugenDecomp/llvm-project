@@ -439,9 +439,9 @@ public:
     return getStorageClass() == COFF::IMAGE_SYM_CLASS_CLR_TOKEN;
   }
 
-private:
   bool isSet() const { return CS16 || CS32; }
 
+private:
   const coff_symbol16 *CS16 = nullptr;
   const coff_symbol32 *CS32 = nullptr;
 };
