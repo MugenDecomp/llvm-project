@@ -916,13 +916,16 @@ std::optional<Symbol *> ObjFile::createDefined(
       newSectionHeader->SizeOfRawData = symbolLength;
       newSectionHeader->PointerToRawData =
           baseChunk->header->PointerToRawData + symbolOffset;
-      newSectionHeader->PointerToRelocations = 0; // TODO
+      newSectionHeader->PointerToRelocations =
+          baseChunk->header->PointerToRelocations; // TODO
       newSectionHeader->PointerToLinenumbers = 0;
-      newSectionHeader->NumberOfRelocations = 0; // TODO
+      newSectionHeader->NumberOfRelocations =
+          baseChunk->header->NumberOfRelocations; // TODO
       newSectionHeader->NumberOfLinenumbers = 0;
 
       SectionChunk *newSection = make<SectionChunk>(this, newSectionHeader);
       newSection->splitSymbol = name;
+      newSection->setAlignment(4);
 
       chunks.push_back(newSection);
       sparseChunks.push_back(newSection);

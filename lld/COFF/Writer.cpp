@@ -802,7 +802,7 @@ void Writer::run() {
       writeHeader<pe32_header>();
     }
     writeSections();
-    prepareLoadConfig();
+    //prepareLoadConfig();
     sortExceptionTables();
 
     // Fix up the alignment in the TLS Directory's characteristic field,

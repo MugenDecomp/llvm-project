@@ -411,12 +411,23 @@ void SectionChunk::writeTo(uint8_t *buf) const {
   // Apply relocations.
   size_t inputSize = getSize();
   for (const coff_relocation &rel : getRelocs()) {
+    // for split-symbol relocations, we need to check if the VirtualAddress of the reloc falls inside
+    // the range of this chunk.
+    if (splitSymbol.size() > 0 && (rel.VirtualAddress < header->VirtualAddress || rel.VirtualAddress > (header->VirtualAddress + header->VirtualSize))) {
+      continue;
+    } else if (splitSymbol.size() > 0) {
+      // if it falls within, we need to relocate. the actual offset into `buf` we apply
+      // the relocation to is the difference between reloc offset and chunk offset.
+      applyRelocation(buf + (rel.VirtualAddress - header->VirtualAddress), rel);
+    }
+
     // Check for an invalid relocation offset. This check isn't perfect, because
     // we don't have the relocation size, which is only known after checking the
     // machine and relocation type. As a result, a relocation may overwrite the
     // beginning of the following input section.
     if (rel.VirtualAddress >= inputSize) {
-      error("relocation points beyond the end of its parent section");
+      // TODO: originally this throws an error. due to split-sections we skip these instead.
+      //error("relocation points beyond the end of its parent section");
       continue;
     }
 
