@@ -74,7 +74,7 @@ MachineTypes SectionChunk::getMachine() const {
 // SectionChunk is one of the most frequently allocated classes, so it is
 // important to keep it as compact as possible. As of this writing, the number
 // below is the size of this class on x64 platforms.
-static_assert(sizeof(SectionChunk) <= 128, "SectionChunk grew unexpectedly");
+static_assert(sizeof(SectionChunk) <= 88, "SectionChunk grew unexpectedly");
 
 static void add16(uint8_t *p, int16_t v) { write16le(p, read16le(p) + v); }
 static void add32(uint8_t *p, int32_t v) { write32le(p, read32le(p) + v); }
@@ -411,23 +411,12 @@ void SectionChunk::writeTo(uint8_t *buf) const {
   // Apply relocations.
   size_t inputSize = getSize();
   for (const coff_relocation &rel : getRelocs()) {
-    // for split-symbol relocations, we need to check if the VirtualAddress of the reloc falls inside
-    // the range of this chunk.
-    if (splitSymbol.size() > 0 && (rel.VirtualAddress < header->VirtualAddress || rel.VirtualAddress > (header->VirtualAddress + header->VirtualSize))) {
-      continue;
-    } else if (splitSymbol.size() > 0) {
-      // if it falls within, we need to relocate. the actual offset into `buf` we apply
-      // the relocation to is the difference between reloc offset and chunk offset.
-      applyRelocation(buf + (rel.VirtualAddress - header->VirtualAddress), rel);
-    }
-
     // Check for an invalid relocation offset. This check isn't perfect, because
     // we don't have the relocation size, which is only known after checking the
     // machine and relocation type. As a result, a relocation may overwrite the
     // beginning of the following input section.
     if (rel.VirtualAddress >= inputSize) {
-      // TODO: originally this throws an error. due to split-sections we skip these instead.
-      //error("relocation points beyond the end of its parent section");
+      error("relocation points beyond the end of its parent section");
       continue;
     }
 
@@ -728,7 +717,7 @@ bool SectionChunk::isCOMDAT() const {
 void SectionChunk::printDiscardedMessage() const {
   // Removed by dead-stripping. If it's removed by ICF, ICF already
   // printed out the name, so don't repeat that here.
-  if (sym)
+  if (sym && this == repl)
     log("Discarded " + sym->getName());
 }
 

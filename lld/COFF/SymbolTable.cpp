@@ -579,8 +579,7 @@ void SymbolTable::initializeLoadConfig() {
     Err(ctx) << "_load_config_used points to uninitialized data";
     return;
   }
-  uint64_t offsetInChunk = 0; // this is always 0 with split data chunks.
-  //sym->getValue();
+  uint64_t offsetInChunk = sym->getValue();
   if (offsetInChunk + 4 > sc->getSize()) {
     Err(ctx) << "_load_config_used section chunk is too small";
     return;
