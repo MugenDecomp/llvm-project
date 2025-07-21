@@ -916,12 +916,11 @@ std::optional<Symbol *> ObjFile::createDefined(
       newSectionHeader->SizeOfRawData = symbolLength;
       newSectionHeader->PointerToRawData =
           baseChunk->header->PointerToRawData + symbolOffset;
-      newSectionHeader->PointerToRelocations =
-          baseChunk->header->PointerToRelocations; // TODO
-      newSectionHeader->PointerToLinenumbers = 0;
-      newSectionHeader->NumberOfRelocations =
-          baseChunk->header->NumberOfRelocations; // TODO
+      newSectionHeader->PointerToRelocations = baseChunk->header->PointerToRelocations; // TODO
+      newSectionHeader->PointerToLinenumbers = symbolOffset; // this is a bit of an abuse, storing a value here but leaving NumberOfLinenumbers 0 so it is not referenced.
+      newSectionHeader->NumberOfRelocations = baseChunk->header->NumberOfRelocations; // TODO
       newSectionHeader->NumberOfLinenumbers = 0;
+      newSectionHeader->Characteristics = baseChunk->header->Characteristics;
 
       SectionChunk *newSection = make<SectionChunk>(this, newSectionHeader);
       newSection->splitSymbol = name;

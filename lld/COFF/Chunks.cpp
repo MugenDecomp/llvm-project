@@ -419,6 +419,7 @@ void SectionChunk::writeTo(uint8_t *buf) const {
       // if it falls within, we need to relocate. the actual offset into `buf` we apply
       // the relocation to is the difference between reloc offset and chunk offset.
       applyRelocation(buf + (rel.VirtualAddress - header->VirtualAddress), rel);
+      continue;
     }
 
     // Check for an invalid relocation offset. This check isn't perfect, because
@@ -426,9 +427,7 @@ void SectionChunk::writeTo(uint8_t *buf) const {
     // machine and relocation type. As a result, a relocation may overwrite the
     // beginning of the following input section.
     if (rel.VirtualAddress >= inputSize) {
-      // TODO: originally this throws an error. due to split-sections we skip these instead.
-      //error("relocation points beyond the end of its parent section");
-      continue;
+      error("relocation points beyond the end of its parent section");
     }
 
     applyRelocation(buf + rel.VirtualAddress, rel);
@@ -466,6 +465,13 @@ void SectionChunk::applyRelocation(uint8_t *off,
 
   // Compute the RVA of the relocation for relative relocations.
   uint64_t p = rva + rel.VirtualAddress;
+  // if the output chunk is a split-chunk, the virtualaddress in the relocation is offset by the length of the chunks preceding it.
+  // (this is a consequence of splitting the chunks but not adjusting any relocation references).
+  // to work around this, subtract the symbol offset of the output chunk from the rva (`p` here).
+  auto *sc = dyn_cast_or_null<SectionChunk>(c);
+  if (sc && sc->splitSymbol.size() > 0) {
+    s -= sc->header->PointerToLinenumbers;
+  }
   uint64_t imageBase = ctx.config.imageBase;
   switch (getArch()) {
   case Triple::x86_64:
