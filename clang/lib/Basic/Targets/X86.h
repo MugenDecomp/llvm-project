@@ -593,9 +593,8 @@ class LLVM_LIBRARY_VISIBILITY WindowsX86_32TargetInfo
 public:
   WindowsX86_32TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
       : WindowsTargetInfo<X86_32TargetInfo>(Triple, Opts) {
-    DoubleAlign = 32;
-    LongDoubleAlign = 32;
-    LongLongAlign = 64;
+    DoubleAlign = LongLongAlign = 64;
+    DoubleAlign = LongDoubleAlign = 32;
     bool IsWinCOFF =
         getTriple().isOSWindows() && getTriple().isOSBinFormatCOFF();
     bool IsMSVC = getTriple().isWindowsMSVCEnvironment();
@@ -605,6 +604,8 @@ public:
     Layout += "-n8:16:32-a:0:32-S32";
     resetDataLayout(Layout, IsWinCOFF ? "_" : "");
   }
+
+  bool allowsLargerPreferedTypeAlignment() const override { return false; }
 };
 
 // x86-32 Windows Visual Studio target
@@ -614,10 +615,9 @@ public:
   MicrosoftX86_32TargetInfo(const llvm::Triple &Triple,
                             const TargetOptions &Opts)
       : WindowsX86_32TargetInfo(Triple, Opts) {
-    LongDoubleWidth = 64;
-    DoubleAlign = 32;
-    LongDoubleAlign = 32;
+    LongDoubleWidth = LongDoubleAlign = 64;
     LongDoubleFormat = &llvm::APFloat::IEEEdouble();
+    DoubleAlign = LongDoubleAlign = 32;
   }
 
   void getTargetDefines(const LangOptions &Opts,
@@ -628,6 +628,8 @@ public:
     // We lost the original triple, so we use the default.
     Builder.defineMacro("_M_IX86", "600");
   }
+
+  bool allowsLargerPreferedTypeAlignment() const override { return false; }
 };
 
 // x86-32 MinGW target
