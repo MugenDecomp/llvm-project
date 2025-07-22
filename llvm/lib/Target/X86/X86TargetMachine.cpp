@@ -141,14 +141,14 @@ static std::string computeDataLayout(const Triple &TT) {
   // 128 bit integers are not specified in the 32-bit ABIs but are used
   // internally for lowering f128, so we match the alignment to that.
   if (TT.isArch64Bit() || TT.isOSWindows() || TT.isOSNaCl())
-    Ret += "-i64:32:32-i128:128";
+    Ret += "-i64:64-i128:128";
   else if (TT.isOSIAMCU())
     Ret += "-i64:32-f64:32";
   else
     Ret += "-i128:128-f64:32:64";
 
   if (TT.isOSWindows())
-    Ret += "-f64:32:32";
+    Ret += "-f64:32:32-";
 
   // Some ABIs align long double to 128 bits, others to 32.
   if (TT.isOSNaCl() || TT.isOSIAMCU())
