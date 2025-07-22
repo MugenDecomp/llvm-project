@@ -593,7 +593,8 @@ class LLVM_LIBRARY_VISIBILITY WindowsX86_32TargetInfo
 public:
   WindowsX86_32TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
       : WindowsTargetInfo<X86_32TargetInfo>(Triple, Opts) {
-    DoubleAlign = LongLongAlign = 64;
+    DoubleAlign = 32;
+    LongLongAlign = 64;
     bool IsWinCOFF =
         getTriple().isOSWindows() && getTriple().isOSBinFormatCOFF();
     bool IsMSVC = getTriple().isWindowsMSVCEnvironment();
