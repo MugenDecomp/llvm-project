@@ -599,7 +599,7 @@ public:
         getTriple().isOSWindows() && getTriple().isOSBinFormatCOFF();
     bool IsMSVC = getTriple().isWindowsMSVCEnvironment();
     std::string Layout = IsWinCOFF ? "e-m:x" : "e-m:e";
-    Layout += "-p:32:32-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-";
+    Layout += "-p:32:32-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f64:32:32-";
     Layout += IsMSVC ? "f80:128" : "f80:32";
     Layout += "-n8:16:32-a:0:32-S32";
     resetDataLayout(Layout, IsWinCOFF ? "_" : "");
