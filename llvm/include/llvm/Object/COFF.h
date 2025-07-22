@@ -454,6 +454,7 @@ struct coff_section {
   support::ulittle32_t PointerToRawData;
   support::ulittle32_t PointerToRelocations;
   support::ulittle32_t PointerToLinenumbers;
+#define SplitSymbolOffset PointerToLinenumbers
   support::ulittle16_t NumberOfRelocations;
   support::ulittle16_t NumberOfLinenumbers;
   support::ulittle32_t Characteristics;

@@ -863,6 +863,12 @@ static std::string createResponseFile(const opt::InputArgList &args,
       os << arg->getSpelling() << '@' << quote(rewritePath(iOrderFile)) << '\n';
       break;
     }
+    case OPT_dorder: {
+      StringRef dataOrderFile = arg->getValue();
+      dataOrderFile.consume_front("@");
+      os << arg->getSpelling() << '@' << quote(rewritePath(dataOrderFile)) << '\n';
+      break;
+    }
     case OPT_pdbstream: {
       const std::pair<StringRef, StringRef> nameFile =
           StringRef(arg->getValue()).split("=");
@@ -1138,6 +1144,59 @@ void LinkerDriver::parseImportOrderFile(StringRef arg) {
                   << " [LNKC0001]";
     } else
       ctx.config.importOrder[s] = INT_MIN + ctx.config.importOrder.size();
+  }
+
+  // Include in /reproduce: output if applicable.
+  ctx.driver.takeBuffer(std::move(mb));
+}
+
+// Parse an /dorder file. If an option is given, the linker orders
+// data as provided.
+void LinkerDriver::parseDataOrderFile(StringRef arg) {
+  // For some reason, the MSVC linker requires a filename to be
+  // preceded by "@".
+  if (!arg.starts_with("@")) {
+    Err(ctx) << "malformed /iorder option: '@' missing";
+    return;
+  }
+
+  // Get a set of all imports for error checking.
+  DenseSet<StringRef> set;
+  ctx.symtab.forEachSymbol(
+      [&set, this](Symbol *s) { set.insert(s->getName()); });
+
+  // Open a file.
+  StringRef path = arg.substr(1);
+  std::unique_ptr<MemoryBuffer> mb =
+      CHECK(MemoryBuffer::getFile(path, /*IsText=*/false,
+                                  /*RequiresNullTerminator=*/false,
+                                  /*IsVolatile=*/true),
+            "could not open " + path);
+
+  // Parse a file. An order file contains one symbol per line.
+  // All symbols that were not present in a given order file are
+  // considered to have the lowest priority 0 and are placed at
+  // end of an output section.
+  for (StringRef arg : args::getLines(mb->getMemBufferRef())) {
+    std::string s(arg);
+    if (s.find(":") == std::string::npos) {
+      Err(ctx) << "/dorder:" << arg << ": no section name was specified";
+    }
+
+    std::string name = "_" + s.substr(0, s.find(":"));
+    std::string section = s.substr(s.find(":") + 1);
+
+    if (set.count(name) == 0) {
+      if (ctx.config.warnMissingOrderSymbol)
+        Warn(ctx) << "/dorder:" << arg << ": missing data: " << name
+                  << " [LNKC0001]";
+    } else if (section.compare("data") == 0) {
+      ctx.config.dataOrder[name] = INT_MIN + ctx.config.dataOrder.size();
+    } else if (section.compare("rdata") == 0) {
+      ctx.config.rdataOrder[name] = INT_MIN + ctx.config.rdataOrder.size();
+    } else {
+      Err(ctx) << "/dorder:" << arg << ": section name " << section << " was not understood (should be one of data,rdata)";
+    }
   }
 
   // Include in /reproduce: output if applicable.
@@ -2833,6 +2892,11 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   // Handle /iorder.
   if (auto *arg = args.getLastArg(OPT_iorder)) {
     parseImportOrderFile(arg->getValue());
+  }
+
+  // Handle /dorder.
+  if (auto *arg = args.getLastArg(OPT_dorder)) {
+    parseDataOrderFile(arg->getValue());
   }
 
   if (args.hasFlag(OPT_ihead, OPT_ihead_no, false)) {

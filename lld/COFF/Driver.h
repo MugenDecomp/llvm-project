@@ -149,6 +149,8 @@ private:
 
   void parseImportOrderFile(StringRef arg);
 
+  void parseDataOrderFile(StringRef arg);
+
   void parseComdatRealign(StringRef s);
 
   void parseCallGraphFile(StringRef path);

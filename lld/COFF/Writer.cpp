@@ -263,6 +263,7 @@ private:
   void addSyntheticIdata();
   void sortBySectionOrder(std::vector<Chunk *> &chunks);
   void fixPartialSectionChars(StringRef name, uint32_t chars);
+  void applyDataOrdering(StringRef name, llvm::StringMap<int> order);
   bool fixGnuImportChunks();
   void fixTlsAlignment();
   PartialSection *createPartialSection(StringRef name, uint32_t outChars);
@@ -802,7 +803,7 @@ void Writer::run() {
       writeHeader<pe32_header>();
     }
     writeSections();
-    //prepareLoadConfig();
+    prepareLoadConfig();
     sortExceptionTables();
 
     // Fix up the alignment in the TLS Directory's characteristic field,
@@ -869,6 +870,37 @@ void Writer::fixPartialSectionChars(StringRef name, uint32_t chars) {
     destSec->chunks.insert(destSec->chunks.end(), pSec->chunks.begin(),
                            pSec->chunks.end());
     pSec->chunks.clear();
+  }
+}
+
+// sort chunks according to the provided data ordering.
+void Writer::applyDataOrdering(StringRef name, llvm::StringMap<int> order) {
+  if (order.size() == 0)
+    return;
+
+  for (auto it : partialSections) {
+    PartialSection *pSec = it.second;
+    StringRef curName = pSec->name;
+    if (curName.compare(name) == 0) {
+      Log(ctx) << "Applying data ordering to section with name " << name;
+      llvm::stable_sort(pSec->chunks, [&](Chunk *c1, Chunk *c2) {
+        // we want to apply the order to SectionChunk only. for all other
+        // chunks, they belong at the end.
+        SectionChunk *sc1 = dyn_cast_or_null<SectionChunk>(c1);
+        SectionChunk *sc2 = dyn_cast_or_null<SectionChunk>(c2);
+
+        // create targets for the two chunks.
+        int target1 = 0, target2 = 0;
+        if (sc1 && sc1->splitSymbol.size() > 0 && order.count(sc1->splitSymbol) > 0) {
+          target1 = order[sc1->splitSymbol];
+        }
+        if (sc2 && sc2->splitSymbol.size() > 0 && order.count(sc2->splitSymbol) > 0) {
+          target2 = order[sc2->splitSymbol];
+        }
+
+        return target1 < target2;
+      });
+    }
   }
 }
 
@@ -1137,6 +1169,12 @@ void Writer::createSections() {
 
   fixPartialSectionChars(".rsrc", data | r);
   fixPartialSectionChars(".edata", data | r);
+
+  // apply /DORDER sorting now.
+  // it needs to be applied here because the synthetic idata chunks being added to the section might mess with the ordering.
+  applyDataOrdering(".data", ctx.config.dataOrder);
+  applyDataOrdering(".rdata", ctx.config.rdataOrder);
+
   // Even in non MinGW cases, we might need to link against GNU import
   // libraries.
   bool hasIdata = fixGnuImportChunks();
@@ -2905,6 +2943,12 @@ void Writer::prepareLoadConfig() {
     OutputSection *sec = ctx.getOutputSection(symtab.loadConfigSym->getChunk());
     uint8_t *secBuf = buffer->getBufferStart() + sec->getFileOff();
     uint8_t *symBuf = secBuf + (symtab.loadConfigSym->getRVA() - sec->getRVA());
+
+    Chunk *c = symtab.loadConfigSym->getChunk();
+    auto *sc = dyn_cast_or_null<SectionChunk>(c);
+    if (sc && sc->splitSymbol.size() > 0) {
+      symBuf -= sc->header->SplitSymbolOffset;
+    }
 
     if (ctx.config.is64())
       prepareLoadConfig(symtab,

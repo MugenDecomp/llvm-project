@@ -223,6 +223,10 @@ struct Configuration {
   // Used for /iorder.
   llvm::StringMap<int> importOrder;
 
+  // Used for /dorder.
+  llvm::StringMap<int> dataOrder;
+  llvm::StringMap<int> rdataOrder;
+
   // Used for /realign.
   llvm::StringMap<int> realignMap;
 

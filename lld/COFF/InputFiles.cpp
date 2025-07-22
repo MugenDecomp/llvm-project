@@ -421,7 +421,6 @@ SectionChunk *ObjFile::readSection(uint32_t sectionNumber,
     // if tail merge is not enabled, and the chunk is data-containing, we push a VirtualSectionChunk
     // instead of a SectionChunk.
     c = make<VirtualSectionChunk>(this, sec);
-    log("Found a section with name " + name + " in objfile " + getName() + ", creating VirtualSection for it.");
   }
   else
     c = make<SectionChunk>(this, sec);
@@ -917,14 +916,14 @@ std::optional<Symbol *> ObjFile::createDefined(
       newSectionHeader->PointerToRawData =
           baseChunk->header->PointerToRawData + symbolOffset;
       newSectionHeader->PointerToRelocations = baseChunk->header->PointerToRelocations; // TODO
-      newSectionHeader->PointerToLinenumbers = symbolOffset; // this is a bit of an abuse, storing a value here but leaving NumberOfLinenumbers 0 so it is not referenced.
+      newSectionHeader->SplitSymbolOffset = symbolOffset; // this is slightly abuse, NumberOfLinenumbers is not supported in split-sections so we overload the PointerToLinenumbers to store the symbol offset for later calcs.
       newSectionHeader->NumberOfRelocations = baseChunk->header->NumberOfRelocations; // TODO
       newSectionHeader->NumberOfLinenumbers = 0;
       newSectionHeader->Characteristics = baseChunk->header->Characteristics;
 
       SectionChunk *newSection = make<SectionChunk>(this, newSectionHeader);
       newSection->splitSymbol = name;
-      newSection->setAlignment(4);
+      newSection->setAlignment(1);
 
       chunks.push_back(newSection);
       sparseChunks.push_back(newSection);

@@ -413,7 +413,7 @@ void SectionChunk::writeTo(uint8_t *buf) const {
   for (const coff_relocation &rel : getRelocs()) {
     // for split-symbol relocations, we need to check if the VirtualAddress of the reloc falls inside
     // the range of this chunk.
-    if (splitSymbol.size() > 0 && (rel.VirtualAddress < header->VirtualAddress || rel.VirtualAddress > (header->VirtualAddress + header->VirtualSize))) {
+    if (splitSymbol.size() > 0 && (rel.VirtualAddress < header->VirtualAddress || rel.VirtualAddress >= (header->VirtualAddress + header->VirtualSize))) {
       continue;
     } else if (splitSymbol.size() > 0) {
       // if it falls within, we need to relocate. the actual offset into `buf` we apply
@@ -470,7 +470,7 @@ void SectionChunk::applyRelocation(uint8_t *off,
   // to work around this, subtract the symbol offset of the output chunk from the rva (`p` here).
   auto *sc = dyn_cast_or_null<SectionChunk>(c);
   if (sc && sc->splitSymbol.size() > 0) {
-    s -= sc->header->PointerToLinenumbers;
+    s -= sc->header->SplitSymbolOffset;
   }
   uint64_t imageBase = ctx.config.imageBase;
   switch (getArch()) {
