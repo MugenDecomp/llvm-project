@@ -117,7 +117,7 @@ TargetInfo::TargetInfo(const llvm::Triple &T) : Triple(T) {
   FloatWidth = 32;
   FloatAlign = 32;
   DoubleWidth = 64;
-  DoubleAlign = 64;
+  DoubleAlign = 32;
   LongDoubleWidth = 64;
   LongDoubleAlign = 64;
   Float128Align = 128;

@@ -907,7 +907,13 @@ std::optional<Symbol *> ObjFile::createDefined(
       auto baseChunk =
           dyn_cast<VirtualSectionChunk>(sparseChunks[sectionNumber]);
       coff_section *newSectionHeader = new coff_section{};
-      strncpy(newSectionHeader->Name, baseChunk->header->Name, 8);
+      // put `.bss` data into `.data` instead
+      // this is a hack to make sure the two sections are inter-sortable.
+      if (strcmp(baseChunk->header->Name, ".bss") == 0) {
+        strncpy(newSectionHeader->Name, ".data", 6);
+      } else {
+        strncpy(newSectionHeader->Name, baseChunk->header->Name, 8);
+      }
       strcat(newSectionHeader->Name, "$s");
       newSectionHeader->VirtualSize = symbolLength;
       newSectionHeader->VirtualAddress =
@@ -920,10 +926,22 @@ std::optional<Symbol *> ObjFile::createDefined(
       newSectionHeader->NumberOfRelocations = baseChunk->header->NumberOfRelocations; // TODO
       newSectionHeader->NumberOfLinenumbers = 0;
       newSectionHeader->Characteristics = baseChunk->header->Characteristics;
+      // apply .data characteristics to bss split-chunks
+      // because we set IMAGE_SCN_CNT_INITIALIZED_DATA here, the chunk by default will
+      // contain junk data (LLD reads the data from the image but for uninitialized data it fills with zeros)
+      // the easy fix here is to set `hasData` to `false` on the chunk.
+      if (strcmp(baseChunk->header->Name, ".bss") == 0) {
+        newSectionHeader->Characteristics =
+            IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_ALIGN_8BYTES |
+            IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
+      }
 
       SectionChunk *newSection = make<SectionChunk>(this, newSectionHeader);
       newSection->splitSymbol = name;
       newSection->setAlignment(1);
+      if (strcmp(baseChunk->header->Name, ".bss") == 0) {
+        newSection->hasData = false;
+      }
 
       chunks.push_back(newSection);
       sparseChunks.push_back(newSection);
