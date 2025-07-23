@@ -2603,7 +2603,7 @@ void Writer::writeSections() {
         memset(secBuf + prevEnd, 0xCC, off - prevEnd);
         prevEnd = off + c->getSize();
       }
-      memset(secBuf + prevEnd, 0xCC, sec->getRawSize() - prevEnd);
+      memset(secBuf + prevEnd, 0x00, sec->getRawSize() - prevEnd);
     }
 
     parallelForEach(sec->chunks, [&](Chunk *c) {
